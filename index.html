@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7B2580">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Banqueiro">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Banqueiro do Jogo da Vida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
+<style>
+/* Layout: cabeçalho fixo com a trilha do tabuleiro, abas embaixo (polegar), cartões de jogador em grade. */
+:root {
+  --bg: #EDF2E8;
+  --surface: #FFFFFF;
+  --surface2: #F5F8F1;
+  --ink: #1D1B22;
+  --muted: #59556A;
+  --line: #D5DDCD;
+  --accent: #7B2580;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #F1E5F3;
+  --pay: #2B7428;
+  --pay-soft: #E0F0D8;
+  --recv: #A3461A;
+  --recv-soft: #FBE5D4;
+  --swap: #245A96;
+  --swap-soft: #E2EBF7;
+  --t1: #3E9A3A; --t2: #E8792B; --t3: #F2C230; --t4: #2F6FB7; --t5: #8E2A8B;
+  --font: 'Nunito', ui-rounded, 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141217; --surface: #1F1C25; --surface2: #27232E; --ink: #F2EFF6; --muted: #ADA7B8; --line: #3A3444;
+    --accent: #D9A0E2; --accent-ink: #22102A; --accent-soft: #3A2341;
+    --pay: #8FD47C; --pay-soft: #1E321D; --recv: #F4A872; --recv-soft: #3B2618; --swap: #93BBEE; --swap-soft: #1D2A3C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141217; --surface: #1F1C25; --surface2: #27232E; --ink: #F2EFF6; --muted: #ADA7B8; --line: #3A3444;
+  --accent: #D9A0E2; --accent-ink: #22102A; --accent-soft: #3A2341;
+  --pay: #8FD47C; --pay-soft: #1E321D; --recv: #F4A872; --recv-soft: #3B2618; --swap: #93BBEE; --swap-soft: #1D2A3C;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-weight: 600; font-size: 15px; line-height: 1.4; -webkit-tap-highlight-color: transparent; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1100px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3, h4 { margin: 0; font-weight: 900; text-wrap: balance; }
+small { font-weight: 700; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Cabeçalho */
+.topo { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.topo-in { display: flex; align-items: center; gap: 10px; padding-block: 10px; }
+.marca { display: flex; flex-direction: column; min-width: 0; margin-right: auto; }
+.marca-t { font-size: 20px; font-weight: 900; color: var(--accent); line-height: 1.1; }
+.marca-s { font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trilha { height: 7px; background: repeating-linear-gradient(90deg, var(--t1) 0 26px, var(--surface) 26px 29px, var(--t2) 29px 55px, var(--surface) 55px 58px, var(--t3) 58px 84px, var(--surface) 84px 87px, var(--t4) 87px 113px, var(--surface) 113px 116px, var(--t5) 116px 142px, var(--surface) 142px 145px); }
+.vez { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--accent); background: var(--accent-soft); font-weight: 800; cursor: pointer; max-width: 46vw; }
+.vez b { font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pino { flex-shrink: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--c, var(--accent)); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px color-mix(in srgb, var(--ink) 25%, transparent); }
+
+/* Botões */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface2); font-weight: 800; font-size: 15px; cursor: pointer; text-align: center; }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.mini { min-height: 40px; padding: 6px 12px; font-size: 14px; }
+.btn.pay { background: var(--pay-soft); color: var(--pay); border-color: color-mix(in srgb, var(--pay) 30%, transparent); }
+.btn.recv { background: var(--recv-soft); color: var(--recv); border-color: color-mix(in srgb, var(--recv) 30%, transparent); }
+.btn.swap { background: var(--swap-soft); color: var(--swap); border-color: color-mix(in srgb, var(--swap) 30%, transparent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.grande { min-height: 54px; font-size: 17px; width: 100%; }
+.btn.perigo { color: var(--recv); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Estrutura */
+main { padding-block: 16px calc(96px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 16px; }
+.bloco { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bloco > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.bloco h2 { font-size: 18px; }
+.dica { font-size: 13px; color: var(--muted); font-weight: 700; }
+.linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.grade2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; align-items: start; }
+
+/* Roleta */
+.nums { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.n { min-height: 52px; border-radius: 12px; border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 16%, var(--surface)); font-size: 21px; font-weight: 900; cursor: pointer; font-variant-numeric: tabular-nums; }
+.n.on { background: var(--c); color: #FFFFFF; }
+.nchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.nchip { min-width: 40px; min-height: 40px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface2); font-weight: 900; cursor: pointer; font-variant-numeric: tabular-nums; }
+.nchip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.resultado { display: flex; flex-direction: column; gap: 6px; }
+.msg { border-radius: 10px; padding: 9px 12px; font-weight: 800; }
+.msg.pay { background: var(--pay-soft); color: var(--pay); }
+.msg.recv { background: var(--recv-soft); color: var(--recv); }
+.msg.swap { background: var(--swap-soft); color: var(--swap); }
+.msg.info { background: var(--surface2); color: var(--ink); }
+
+/* Jogadores */
+.jogadores { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 12px; align-items: start; }
+.jog { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.jog.vezdele { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); }
+.jog-cab { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.jog-cab h3 { font-size: 18px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: auto; }
+.tag { flex-shrink: 0; font-size: 12px; font-weight: 900; letter-spacing: .04em; border-radius: 999px; padding: 2px 8px; background: var(--accent-soft); color: var(--accent); }
+.tag.campo { background: var(--pay-soft); color: var(--pay); }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin: 0; }
+.stats div { min-width: 0; }
+.stats dt { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.stats dd { margin: 0; font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.aviso { margin: 0; font-size: 14px; font-weight: 800; color: var(--recv); }
+.painel { border-top: 1px dashed var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 12px; }
+.painel h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.campos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+label.f { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 800; color: var(--muted); min-width: 0; }
+.inp { display: flex; align-items: center; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface2); min-height: 44px; padding: 0 8px; gap: 4px; }
+.inp input { border: 0; background: transparent; width: 100%; min-width: 0; font-weight: 900; font-size: 16px; color: var(--ink); padding: 8px 0; font-variant-numeric: tabular-nums; }
+.inp input:focus { outline: none; }
+.inp:focus-within { border-color: var(--accent); }
+.inp span { font-size: 13px; font-weight: 800; color: var(--muted); }
+input.texto, select.texto { min-height: 44px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface2); padding: 8px 10px; font-weight: 800; font-size: 16px; width: 100%; min-width: 0; }
+.contador { display: inline-flex; align-items: center; gap: 10px; }
+.contador b { font-size: 18px; min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
+.apos { background: var(--accent-soft); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.conta { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-weight: 800; }
+.conta li { display: flex; justify-content: space-between; gap: 10px; }
+.conta .pay { color: var(--pay); }
+.conta .recv { color: var(--recv); }
+.conta .saldo { border-top: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); padding-top: 4px; font-weight: 900; }
+
+/* Lançamentos */
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.log li { display: grid; grid-template-columns: 44px 10px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.log li:last-child { border-bottom: 0; }
+.log time { color: var(--muted); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); align-self: center; }
+.dot.pay { background: var(--pay); } .dot.recv { background: var(--recv); } .dot.swap { background: var(--swap); }
+.vazio { color: var(--muted); font-weight: 700; margin: 0; }
+
+/* Setup */
+.titulo { font-size: 26px; color: var(--accent); }
+.sub { margin: 0; color: var(--muted); font-weight: 700; }
+.pl { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; border-radius: 12px; background: var(--surface2); }
+.cores { display: flex; flex-wrap: wrap; gap: 8px; }
+.cor { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--surface); background: var(--c); box-shadow: 0 0 0 1.5px var(--line); cursor: pointer; }
+.cor.on { box-shadow: 0 0 0 3px var(--ink); }
+.toggle { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; cursor: pointer; }
+.toggle input { width: 24px; height: 24px; margin: 1px 0 0; accent-color: var(--accent); flex-shrink: 0; }
+.toggle b { display: block; font-weight: 900; }
+.toggle span span { display: block; font-size: 13px; color: var(--muted); font-weight: 700; }
+.lista { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+
+/* Gire para Vencer */
+.part { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface2); }
+.part-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.part-cab .toggle { padding: 0; margin-right: auto; }
+.part .inp { width: 130px; }
+
+/* Placar */
+.ranking { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ranking li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface2); }
+.ranking li.primeiro { background: var(--accent-soft); }
+.pos { font-size: 20px; font-weight: 900; color: var(--muted); font-variant-numeric: tabular-nums; }
+.primeiro .pos { color: var(--accent); }
+.ranking .nome { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 900; }
+.ranking .nome span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking .total { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.fin { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface2); }
+.fin-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+/* Regras */
+details { border-top: 1px solid var(--line); }
+details:first-of-type { border-top: 0; }
+summary { cursor: pointer; list-style: none; padding: 12px 0; font-weight: 900; font-size: 16px; display: flex; justify-content: space-between; gap: 10px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; color: var(--accent); font-size: 20px; line-height: 1; }
+details[open] summary::after { content: "–"; }
+.ref { margin: 0 0 12px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.ref li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.ref li b { text-align: right; font-weight: 900; }
+.ref.texto li { display: block; }
+.ref.texto li b { text-align: left; }
+
+/* Abas e aviso */
+.abas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.abas-in { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding-block: 6px; }
+.aba { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 52px; justify-content: center; border: 0; border-radius: 12px; background: transparent; font-size: 12px; font-weight: 900; color: var(--muted); cursor: pointer; }
+.aba svg { width: 24px; height: 24px; }
+.aba[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+.toast { position: fixed; z-index: 40; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); max-width: 560px; margin: 0 auto; border-radius: 14px; padding: 12px 14px; font-size: 16px; font-weight: 800; box-shadow: 0 8px 24px rgba(0,0,0,.18); display: flex; flex-direction: column; gap: 2px; cursor: pointer; border: 1.5px solid currentColor; }
+.toast .rot { font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.toast.pay { background: var(--pay-soft); color: var(--pay); }
+.toast.recv { background: var(--recv-soft); color: var(--recv); }
+.toast.swap { background: var(--swap-soft); color: var(--swap); }
+.toast.info { background: var(--surface); color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .toast:not([hidden]) { animation: sobe .18s ease-out; }
+  @keyframes sobe { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+}
+@media (min-width: 720px) {
+  .abas-in { max-width: 560px; }
+}
+</style>
+
+</head>
+<body>
+<header class="topo">
+  <div class="wrap topo-in">
+    <div class="marca">
+      <span class="marca-t">Banqueiro</span>
+      <span class="marca-s" id="status">Jogo da Vida</span>
+    </div>
+    <button type="button" id="vez" class="vez" data-act="vez" hidden></button>
+    <button type="button" id="desfazer" class="btn mini" data-act="desfazer" disabled>Desfazer</button>
+  </div>
+  <div class="trilha" aria-hidden="true"></div>
+</header>
+
+<main id="app" class="wrap" aria-live="polite"></main>
+
+<div id="toast" class="toast info" role="status" hidden></div>
+
+<nav class="abas" id="abas" aria-label="Seções" hidden>
+  <div class="wrap abas-in">
+    <button type="button" class="aba" data-act="tab" data-tab="mesa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 3v6.5M12 14.5V21M3 12h6.5M14.5 12H21"/></svg>
+      Mesa
+    </button>
+    <button type="button" class="aba" data-act="tab" data-tab="calc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h0M16 11h0M8 15h2M12 15h0M16 15v3M8 18h2M12 18h0"/></svg>
+      Calcular
+    </button>
+    <button type="button" class="aba" data-act="tab" data-tab="final">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3.5 4M17 6h3a3 3 0 0 1-3.5 4M12 14v3M8 21h8M9 17h6v4H9z"/></svg>
+      Final
+    </button>
+    <button type="button" class="aba" data-act="tab" data-tab="regras">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7M8 11h7"/></svg>
+      Regras
+    </button>
+  </div>
+</nav>
+
+<script>
+(function () {
+  'use strict';
+
+  const K = 1000;
+  const CORES = [
+    { id: 'vermelho', nome: 'Vermelho', hex: '#D9483B' },
+    { id: 'azul', nome: 'Azul', hex: '#2F6FB7' },
+    { id: 'verde', nome: 'Verde', hex: '#3E9A3A' },
+    { id: 'amarelo', nome: 'Amarelo', hex: '#E2B007' },
+    { id: 'laranja', nome: 'Laranja', hex: '#E8792B' },
+    { id: 'roxo', nome: 'Roxo', hex: '#8E2A8B' }
+  ];
+  const LS_KEY = 'banqueiro-jogo-da-vida';
+  const LS_TELA = 'banqueiro-jogo-da-vida-tela';
+  const DOC = 'jogo/atual';
+  const ROTULO = { pay: 'Banco entrega', recv: 'Banco recebe', swap: 'Entre jogadores', info: 'Anotado' };
+
+  let S = null;
+  let tab = 'mesa';
+  let hist = [];
+  let db = null;
+  let lsOk = true;
+  let confirmNova = false;
+  let toastTimer = null;
+  let saveTimer = null;
+  let wake = null;
+
+  const $ = (id) => document.getElementById(id);
+  const corHex = (id) => (CORES.find((c) => c.id === id) || CORES[0]).hex;
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = (v) => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  const hora = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  function fmt(v) {
+    v = Math.round(v || 0);
+    const neg = v < 0; v = Math.abs(v);
+    let s;
+    if (v >= K) s = '$' + (v / K).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'k';
+    else s = '$' + v.toLocaleString('pt-BR');
+    return (neg ? '−' : '') + s;
+  }
+  function listaNomes(arr) {
+    if (!arr.length) return '';
+    if (arr.length === 1) return arr[0];
+    return arr.slice(0, -1).join(', ') + ' e ' + arr[arr.length - 1];
+  }
+
+  function novoEstado() {
+    return {
+      v: 1, fase: 'setup',
+      setup: { n: 4, jogadores: CORES.map((c, i) => ({ nome: 'Jogador ' + (i + 1), cor: c.id })) },
+      config: { juros35: true, patrulhaTodos: true, objetivos: true },
+      jogadores: [], vez: 0, log: [], giro: null,
+      gire: { part: {}, resultado: null },
+      calc: { casal: '', casalN: null, bebe: '', metade: '' },
+      final: {}, atualizadoEm: 0
+    };
+  }
+  function normalizar(s) {
+    const b = novoEstado();
+    if (!s || typeof s !== 'object') return b;
+    const o = Object.assign(b, s);
+    o.config = Object.assign(novoEstado().config, s.config || {});
+    o.calc = Object.assign(novoEstado().calc, s.calc || {});
+    o.gire = s.gire && s.gire.part ? s.gire : { part: {}, resultado: null };
+    o.final = s.final && typeof s.final === 'object' ? s.final : {};
+    o.log = Array.isArray(s.log) ? s.log : [];
+    o.jogadores = Array.isArray(s.jogadores) ? s.jogadores : [];
+    if (!o.setup || !Array.isArray(o.setup.jogadores) || o.setup.jogadores.length < 6) o.setup = novoEstado().setup;
+    if (!(o.vez >= 0 && o.vez < o.jogadores.length)) o.vez = 0;
+    if (o.fase === 'jogo' && !o.jogadores.length) o.fase = 'setup';
+    return o;
+  }
+
+  /* ---------- Guardar ---------- */
+  function lerLocal() { try { const t = localStorage.getItem(LS_KEY); return t ? JSON.parse(t) : null; } catch (e) { lsOk = false; return null; } }
+  function gravarLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); lsOk = true; } catch (e) { lsOk = false; } }
+  function setStatus(t) { $('status').textContent = 'Jogo da Vida · ' + t; }
+  function salvar() {
+    gravarLocal();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => salvarRemoto(0), 600);
+  }
+  async function salvarRemoto(tentativa) {
+    if (!db) { setStatus(lsOk ? 'salvo neste aparelho' : 'não está salvando'); return; }
+    try {
+      setStatus('salvando…');
+      await db.doc(DOC).set({ estado: JSON.parse(JSON.stringify(S)), atualizadoEm: S.atualizadoEm || 0 });
+      setStatus('salvo');
+    } catch (e) {
+      if (e && e.code === 'unavailable' && tentativa < 1) setTimeout(() => salvarRemoto(1), 1200 + Math.random() * 1200);
+      else setStatus(lsOk ? 'salvo neste aparelho' : 'não está salvando');
+    }
+  }
+  async function conectar(tentativa) {
+    try {
+      if (!window.claude || typeof window.claude.use !== 'function') {
+        if (!tentativa) { setTimeout(() => conectar(1), 1200); return; }
+        setStatus(lsOk ? 'salvo neste aparelho' : 'não está salvando');
+        return;
+      }
+      const d = await window.claude.use('db');
+      if (!d) { setStatus(lsOk ? 'salvo neste aparelho' : 'não está salvando'); return; }
+      db = d;
+      const snap = await db.doc(DOC).get();
+      const corpo = snap.exists ? snap.data() : null;
+      const remoto = corpo && corpo.estado ? corpo.estado : null;
+      if (remoto && (remoto.atualizadoEm || 0) > (S.atualizadoEm || 0)) {
+        S = normalizar(JSON.parse(JSON.stringify(remoto)));
+        hist = [];
+        gravarLocal();
+        render();
+        setStatus('salvo');
+      } else if ((S.atualizadoEm || 0) > ((remoto && remoto.atualizadoEm) || 0)) {
+        salvarRemoto(0);
+      } else {
+        setStatus('salvo');
+      }
+    } catch (e) {
+      setStatus(lsOk ? 'salvo neste aparelho' : 'não está salvando');
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && saveTimer) { clearTimeout(saveTimer); saveTimer = null; salvarRemoto(0); }
+    if (document.visibilityState === 'visible' && prefTela()) pedirTela();
+  });
+
+  /* ---------- Tela ligada ---------- */
+  function prefTela() { try { return localStorage.getItem(LS_TELA) === '1'; } catch (e) { return false; } }
+  function setPrefTela(v) { try { localStorage.setItem(LS_TELA, v ? '1' : '0'); } catch (e) {} }
+  async function pedirTela() {
+    try {
+      if (wake || !('wakeLock' in navigator)) return;
+      wake = await navigator.wakeLock.request('screen');
+      wake.addEventListener('release', () => { wake = null; });
+    } catch (e) { wake = null; }
+  }
+  function soltarTela() { try { if (wake) wake.release(); } catch (e) {} wake = null; }
+
+  /* ---------- Mudanças, desfazer, avisos ---------- */
+  function registrar(texto, tipo) {
+    S.log.unshift({ h: hora(), texto: texto, tipo: tipo || 'info' });
+    if (S.log.length > 80) S.log.length = 80;
+  }
+  function mudar(fn, msg, tipo, rotulo) {
+    hist.push({ s: JSON.stringify(S), rot: rotulo || msg || 'última alteração' });
+    if (hist.length > 40) hist.shift();
+    fn();
+    if (msg) registrar(msg, tipo);
+    S.atualizadoEm = Date.now();
+    salvar();
+    render();
+    if (msg) toast(msg, tipo);
+  }
+  function salvarSemHistorico() { S.atualizadoEm = Date.now(); salvar(); }
+  function toast(msg, tipo) {
+    const el = $('toast');
+    el.className = 'toast ' + (tipo || 'info');
+    el.textContent = '';
+    const rot = document.createElement('span'); rot.className = 'rot'; rot.textContent = ROTULO[tipo || 'info'];
+    const tx = document.createElement('span'); tx.textContent = msg;
+    el.append(rot, tx);
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 5000);
+  }
+  $('toast').addEventListener('click', () => { $('toast').hidden = true; });
+
+  const jog = (id) => S.jogadores.find((p) => p.id === id);
+  const outros = (id) => S.jogadores.filter((p) => p.id !== id);
+  const jurosApos = () => (S.config.juros35 ? 35 * K : 25 * K);
+
+  /* ---------- Render ---------- */
+  function render() {
+    const emJogo = S.fase === 'jogo';
+    $('abas').hidden = !emJogo;
+    $('desfazer').disabled = !hist.length;
+    const vez = $('vez');
+    if (emJogo && S.jogadores.length) {
+      const p = S.jogadores[S.vez];
+      vez.hidden = false;
+      vez.innerHTML = '<span class="pino" style="--c:' + corHex(p.cor) + '"></span><span>Vez:</span> <b>' + esc(p.nome) + '</b><span aria-hidden="true">›</span>';
+      vez.setAttribute('aria-label', 'Passar a vez. Agora é a vez de ' + p.nome);
+    } else vez.hidden = true;
+    document.querySelectorAll('.aba').forEach((b) => {
+      if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    const app = $('app');
+    if (!emJogo) app.innerHTML = vSetup();
+    else if (tab === 'calc') app.innerHTML = vCalc();
+    else if (tab === 'final') app.innerHTML = vFinal();
+    else if (tab === 'regras') app.innerHTML = vRegras();
+    else app.innerHTML = vMesa();
+  }
+
+  function vSetup() {
+    const st = S.setup;
+    let h = '<section class="bloco"><header><h1 class="titulo">Nova partida</h1></header>' +
+      '<p class="sub">Monte a mesa. Nomes e cores podem ser mudados depois.</p>' +
+      '<div class="linha"><span class="dica">Jogadores:</span>';
+    for (let n = 2; n <= 6; n++) h += '<button type="button" class="nchip' + (st.n === n ? ' on' : '') + '" data-act="setup-n" data-n="' + n + '" aria-pressed="' + (st.n === n) + '">' + n + '</button>';
+    h += '</div>';
+    for (let i = 0; i < st.n; i++) {
+      const p = st.jogadores[i];
+      h += '<div class="pl"><label class="f" for="sn' + i + '">Jogador ' + (i + 1) + '</label>' +
+        '<input class="texto" id="sn' + i + '" data-campo="setup-nome" data-i="' + i + '" value="' + esc(p.nome) + '" maxlength="18" autocomplete="off">' +
+        '<div class="cores" role="group" aria-label="Cor do carro">';
+      CORES.forEach((c) => {
+        h += '<button type="button" class="cor' + (p.cor === c.id ? ' on' : '') + '" style="--c:' + c.hex + '" data-act="setup-cor" data-i="' + i + '" data-cor="' + c.id + '" aria-label="' + c.nome + '" aria-pressed="' + (p.cor === c.id) + '"></button>';
+      });
+      h += '</div></div>';
+    }
+    h += '</section>';
+    h += '<section class="bloco"><header><h2>Regras da casa</h2></header>' + vToggles() + '</section>';
+    h += '<section class="bloco"><header><h2>Antes de começar, entregue a cada um</h2></header><ul class="lista">' +
+      '<li>1 carro e 1 pino</li><li>$10k</li><li>3 cartas Divisão da Fortuna</li>' +
+      (S.config.objetivos ? '<li>1 Objetivo secreto</li>' : '') + '</ul>' +
+      '<button type="button" class="btn primary grande" data-act="comecar">Começar partida</button></section>';
+    return h;
+  }
+
+  function vToggles() {
+    const c = S.config;
+    const t = (k, titulo, sub) => '<label class="toggle"><input type="checkbox" id="cfg-' + k + '" data-campo="cfg" data-k="' + k + '"' + (c[k] ? ' checked' : '') + '><span><b>' + titulo + '</b><span>' + sub + '</span></span></label>';
+    return t('juros35', 'Juros na aposentadoria', 'Quitar durante o jogo: $25k. Na aposentadoria: $35k por empréstimo.') +
+      t('patrulhaTodos', 'Patrulha para todos', 'Saiu 10: quem gritar “Patrulha!” primeiro recebe $5k de quem girou.') +
+      t('objetivos', 'Objetivo secreto', 'Cumpriu o objetivo: +$100k na contagem final.');
+  }
+
+  function vMesa() {
+    let h = '<section class="bloco"><header><h2>Número da roleta</h2><span class="dica">Toque o número a cada giro</span></header><div class="nums">';
+    for (let n = 1; n <= 10; n++) {
+      const on = S.giro && S.giro.n === n;
+      h += '<button type="button" class="n' + (on ? ' on' : '') + '" style="--c:var(--t' + (((n - 1) % 5) + 1) + ')" data-act="giro" data-n="' + n + '" aria-label="Saiu ' + n + '">' + n + '</button>';
+    }
+    h += '</div>';
+    if (S.giro) {
+      h += '<div class="resultado">';
+      S.giro.itens.forEach((it) => { h += '<div class="msg ' + it.tipo + '">' + esc(it.texto) + '</div>'; });
+      h += '</div>';
+    } else {
+      const inv = S.jogadores.filter((p) => p.investimento);
+      h += '<p class="vazio">' + (inv.length ? 'Investimentos: ' + esc(inv.map((p) => p.nome + ' nº ' + p.investimento).join(' · ')) : 'Ninguém tem Investimento ainda.') + '</p>';
+    }
+    h += '</section><section class="jogadores">';
+    S.jogadores.forEach((p, i) => { h += vJogador(p, i); });
+    h += '</section>';
+    h += '<section class="bloco"><header><h2>Lançamentos</h2><span class="dica">Os mais recentes primeiro</span></header>';
+    if (!S.log.length) h += '<p class="vazio">Nada lançado ainda.</p>';
+    else {
+      h += '<ol class="log">';
+      S.log.slice(0, 15).forEach((l) => { h += '<li><time>' + esc(l.h) + '</time><span class="dot ' + esc(l.tipo) + '"></span><span>' + esc(l.texto) + '</span></li>'; });
+      h += '</ol>';
+    }
+    h += '</section>';
+    return h;
+  }
+
+  function vJogador(p, i) {
+    const hex = corHex(p.cor);
+    const apos = p.aposentado;
+    let h = '<article class="jog' + (i === S.vez ? ' vezdele' : '') + '">';
+    h += '<div class="jog-cab"><span class="pino" style="--c:' + hex + '"></span><h3>' + esc(p.nome) + '</h3>';
+    if (i === S.vez) h += '<span class="tag">Vez</span>';
+    if (apos) h += '<span class="tag' + (apos.local === 'campo' ? ' campo' : '') + '">' + (apos.local === 'campo' ? 'Casa no Campo' : 'Quinta · ' + apos.ordem + 'º') + '</span>';
+    h += '<button type="button" class="btn mini" data-act="abrir" data-id="' + p.id + '" aria-expanded="' + !!p.aberto + '">' + (p.aberto ? 'Fechar' : 'Detalhes') + '</button></div>';
+    h += '<dl class="stats">' +
+      '<div><dt>Salário</dt><dd>' + (p.salario ? fmt(p.salario) : '—') + (p.salarioMax ? ' <small>máx ' + fmt(p.salarioMax) + '</small>' : '') + '</dd></div>' +
+      '<div><dt>Empréstimos</dt><dd>' + p.emprestimos + (p.emprestimos ? ' <small>' + fmt(p.emprestimos * 20 * K) + '</small>' : '') + '</dd></div>' +
+      '<div><dt>Investimento</dt><dd>' + (p.investimento ? 'nº ' + p.investimento : '—') + '</dd></div>' +
+      '<div><dt>Filhos</dt><dd>' + p.filhos + '</dd></div></dl>';
+    if (!apos) {
+      if (!p.salario) h += '<p class="aviso">Sem carreira: preencha o salário em Detalhes.</p>';
+      h += '<div class="acoes">' +
+        '<button type="button" class="btn pay" data-act="salario" data-id="' + p.id + '"' + (p.salario ? '' : ' disabled') + '>Pagamento</button>' +
+        '<button type="button" class="btn pay" data-act="aumento" data-id="' + p.id + '"' + (p.salario ? '' : ' disabled') + '>Pagam. + aumento</button>' +
+        '<button type="button" class="btn pay" data-act="emp-mais" data-id="' + p.id + '">+1 empréstimo</button>' +
+        '<button type="button" class="btn recv" data-act="emp-quitar" data-id="' + p.id + '"' + (p.emprestimos ? '' : ' disabled') + '>Quitar 1</button>' +
+        '</div>';
+    }
+    if (p.aposentando && !apos) h += vAposentar(p);
+    if (p.aberto) h += vPainel(p);
+    h += '</article>';
+    return h;
+  }
+
+  function vPainel(p) {
+    const inpK = (campo, rot, val) => '<label class="f" for="' + campo + '-' + p.id + '">' + rot +
+      '<span class="inp"><span>$</span><input id="' + campo + '-' + p.id + '" type="number" inputmode="decimal" min="0" step="1" data-campo="' + campo + '" data-id="' + p.id + '" value="' + (val ? val / K : '') + '" placeholder="0"><span>k</span></span></label>';
+    let h = '<div class="painel">';
+    h += '<h4>Carreira</h4><div class="campos">' + inpK('p-salario', 'Salário', p.salario) + inpK('p-max', 'Salário máx.', p.salarioMax) + inpK('p-imposto', 'Impostos', p.imposto) + '</div>';
+    h += '<div class="acoes">' +
+      '<button type="button" class="btn recv" data-act="impostos" data-id="' + p.id + '"' + (p.imposto ? '' : ' disabled') + '>Impostos</button>' +
+      '<button type="button" class="btn pay" data-act="restituicao" data-id="' + p.id + '"' + (p.imposto ? '' : ' disabled') + '>Restituição</button>' +
+      '<button type="button" class="btn pay" data-act="faculdade" data-id="' + p.id + '">Faculdade</button>' +
+      '<button type="button" class="btn" data-act="perdeu" data-id="' + p.id + '">Perdeu o emprego</button></div>';
+    h += '<h4>Investimento <small>(compra: $10k)</small></h4><div class="nchips">';
+    for (let n = 1; n <= 10; n++) h += '<button type="button" class="nchip' + (p.investimento === n ? ' on' : '') + '" data-act="investir" data-id="' + p.id + '" data-n="' + n + '" aria-pressed="' + (p.investimento === n) + '">' + n + '</button>';
+    if (p.investimento) h += '<button type="button" class="btn mini" data-act="invest-remover" data-id="' + p.id + '">Remover</button>';
+    h += '</div>';
+    h += '<div class="linha" style="justify-content:space-between"><h4>Filhos</h4><span class="contador">' +
+      '<button type="button" class="nchip" data-act="filho-menos" data-id="' + p.id + '" aria-label="Tirar 1 filho">−</button><b>' + p.filhos + '</b>' +
+      '<button type="button" class="nchip" data-act="filho-mais" data-id="' + p.id + '" aria-label="Somar 1 filho">+</button></span></div>';
+    h += '<label class="f" for="nome-' + p.id + '">Nome<input class="texto" id="nome-' + p.id + '" data-campo="p-nome" data-id="' + p.id + '" value="' + esc(p.nome) + '" maxlength="18" autocomplete="off"></label>';
+    if (!p.aposentado && !p.aposentando) h += '<button type="button" class="btn primary" data-act="aposentar" data-id="' + p.id + '">Chegou ao fim: aposentar</button>';
+    h += '</div>';
+    return h;
+  }
+
+  function contaApos(p) {
+    const emp = p.emprestimos * jurosApos();
+    const casa = (p.casaVenda || 0) * K;
+    const filhos = p.filhos * 10 * K;
+    return { emp, casa, filhos, saldo: casa + filhos - emp };
+  }
+  function vConta(p) {
+    const c = contaApos(p);
+    let h = '';
+    h += '<li class="recv"><span>Empréstimos ' + p.emprestimos + ' × ' + fmt(jurosApos()) + '</span><span class="num">receba ' + fmt(c.emp) + '</span></li>';
+    h += '<li class="pay"><span>Venda da casa</span><span class="num">entregue ' + fmt(c.casa) + '</span></li>';
+    h += '<li class="pay"><span>Filhos ' + p.filhos + ' × $10k</span><span class="num">entregue ' + fmt(c.filhos) + '</span></li>';
+    h += '<li class="saldo"><span>Saldo</span><span class="num">' + (c.saldo >= 0 ? 'entregue ' + fmt(c.saldo) : 'receba ' + fmt(-c.saldo)) + '</span></li>';
+    return h;
+  }
+  function vAposentar(p) {
+    return '<div class="apos"><h4>Aposentadoria</h4>' +
+      '<label class="f" for="p-casa-' + p.id + '">Preço de venda da casa (carta)<span class="inp"><span>$</span><input id="p-casa-' + p.id + '" type="number" inputmode="decimal" min="0" step="1" data-campo="p-casa" data-id="' + p.id + '" value="' + (p.casaVenda || '') + '" placeholder="0"><span>k</span></span></label>' +
+      '<ul class="conta" id="conta-' + p.id + '">' + vConta(p) + '</ul>' +
+      '<p class="vazio" style="margin:0">Recolha a carta Carreira e as cartas Aumento. Investimento e cartas Divisão da Fortuna continuam valendo.</p>' +
+      '<div class="acoes"><button type="button" class="btn primary" data-act="apos-quinta" data-id="' + p.id + '">Quinta dos Milionários</button>' +
+      '<button type="button" class="btn pay" data-act="apos-campo" data-id="' + p.id + '">Casa no Campo</button></div>' +
+      '<button type="button" class="btn" data-act="apos-cancelar" data-id="' + p.id + '">Cancelar</button></div>';
+  }
+
+  function selJog(campo, val, rot) {
+    let h = '<label class="f" for="' + campo + '">' + rot + '<select class="texto" id="' + campo + '" data-campo="' + campo + '"><option value="">Escolha</option>';
+    S.jogadores.forEach((p) => { h += '<option value="' + p.id + '"' + (val === p.id ? ' selected' : '') + '>' + esc(p.nome) + '</option>'; });
+    return h + '</select></label>';
+  }
+
+  function vCalc() {
+    const c = S.calc;
+    let h = '<div class="grade2">';
+    // Casamento
+    h += '<section class="bloco"><header><h2>Casamento</h2><span class="dica">Pino + 1 ficha LIFE</span></header>' + selJog('casal', c.casal, 'Quem casou') +
+      '<span class="dica">Número que saiu nos presentes:</span><div class="nums">';
+    for (let n = 1; n <= 10; n++) h += '<button type="button" class="n' + (c.casalN === n ? ' on' : '') + '" style="--c:var(--t' + (((n - 1) % 5) + 1) + ')" data-act="casal-n" data-n="' + n + '">' + n + '</button>';
+    h += '</div>';
+    if (c.casal && c.casalN) {
+      const p = jog(c.casal);
+      const v = c.casalN >= 8 ? 10 * K : (c.casalN >= 5 ? 5 * K : 0);
+      const os = outros(c.casal);
+      if (p) {
+        h += v ? '<div class="msg swap">' + esc(listaNomes(os.map((o) => o.nome))) + ' pagam ' + fmt(v) + ' cada para ' + esc(p.nome) + ' (total ' + fmt(v * os.length) + ').</div>'
+          : '<div class="msg info">Saiu ' + c.casalN + ': ninguém dá presente.</div>';
+        h += '<button type="button" class="btn swap" data-act="casal-ok">Lançar casamento</button>';
+      }
+    }
+    h += '</section>';
+    // Bebê
+    h += '<section class="bloco"><header><h2>Bebê ou gêmeos</h2><span class="dica">$5k de cada jogador + 1 ficha LIFE</span></header>' + selJog('bebe', c.bebe, 'Quem teve') +
+      '<div class="acoes"><button type="button" class="btn swap" data-act="bebe" data-k="1"' + (c.bebe ? '' : ' disabled') + '>Menino ou menina</button>' +
+      '<button type="button" class="btn swap" data-act="bebe" data-k="2"' + (c.bebe ? '' : ' disabled') + '>Gêmeos</button></div></section>';
+    // Gire para Vencer
+    h += '<section class="bloco"><header><h2>Gire para Vencer</h2><span class="dica">Aposta até $50k · acertou: 10×</span></header>';
+    let total = 0; const apostas = [];
+    S.jogadores.forEach((p) => {
+      const pt = S.gire.part[p.id] || { on: false, aposta: 10, nums: [] };
+      if (pt.on && pt.aposta > 0) { total += pt.aposta * K; apostas.push(p.nome + ' ' + fmt(pt.aposta * K)); }
+      h += '<div class="part"><div class="part-cab"><label class="toggle"><input type="checkbox" data-campo="gire-on" data-id="' + p.id + '"' + (pt.on ? ' checked' : '') + '><span><b>' + esc(p.nome) + '</b></span></label>';
+      if (pt.on) h += '<span class="inp"><span>$</span><input type="number" inputmode="decimal" min="0" max="50" step="1" aria-label="Aposta de ' + esc(p.nome) + '" data-campo="gire-aposta" data-id="' + p.id + '" value="' + pt.aposta + '"><span>k</span></span>';
+      h += '</div>';
+      if (pt.on) {
+        h += '<div class="nchips" role="group" aria-label="Números de ' + esc(p.nome) + '">';
+        for (let n = 1; n <= 10; n++) { const on = pt.nums.indexOf(n) >= 0; h += '<button type="button" class="nchip' + (on ? ' on' : '') + '" data-act="gire-num" data-id="' + p.id + '" data-n="' + n + '" aria-pressed="' + on + '">' + n + '</button>'; }
+        h += '</div>';
+      }
+      h += '</div>';
+    });
+    if (apostas.length) h += '<div class="msg recv">Receba as apostas: ' + esc(apostas.join(' · ')) + ' (total ' + fmt(total) + ').</div>';
+    h += '<span class="dica">Número que saiu:</span><div class="nums">';
+    for (let n = 1; n <= 10; n++) h += '<button type="button" class="n' + (S.gire.resultado && S.gire.resultado.n === n ? ' on' : '') + '" style="--c:var(--t' + (((n - 1) % 5) + 1) + ')" data-act="gire-res" data-n="' + n + '"' + (apostas.length ? '' : ' disabled') + '>' + n + '</button>';
+    h += '</div>';
+    if (S.gire.resultado) h += '<div class="msg ' + (S.gire.resultado.tipo || 'info') + '">' + esc(S.gire.resultado.texto) + '</div>';
+    h += '<button type="button" class="btn" data-act="gire-novo">Nova aposta</button></section>';
+    // Metade
+    const m = num(c.metade);
+    h += '<section class="bloco"><header><h2>Metade</h2><span class="dica">Cartas Receber e Pagar</span></header>' +
+      '<label class="f" for="metade">Valor do espaço<span class="inp"><span>$</span><input id="metade" type="number" inputmode="decimal" min="0" step="1" data-campo="metade" value="' + esc(c.metade) + '" placeholder="0"><span>k</span></span></label>' +
+      '<div class="msg info" id="metade-res">Metade: ' + fmt(m * K / 2) + '</div></section>';
+    h += '</div>';
+    return h;
+  }
+
+  function vFinal() {
+    let h = '<div class="grade2"><section class="bloco"><header><h2>Contagem final</h2></header>' +
+      '<p class="sub">Com todos aposentados, cada um conta o dinheiro e vira as fichas LIFE. Digite em milhares: 1250 = $1.250k.</p>';
+    S.jogadores.forEach((p) => {
+      const f = S.final[p.id] || {};
+      h += '<div class="fin"><div class="nome linha"><span class="pino" style="--c:' + corHex(p.cor) + '"></span><b>' + esc(p.nome) + '</b></div><div class="fin-campos">' +
+        '<label class="f" for="fd-' + p.id + '">Dinheiro<span class="inp"><span>$</span><input id="fd-' + p.id + '" type="number" inputmode="decimal" min="0" step="1" data-campo="fin-din" data-id="' + p.id + '" value="' + (f.din == null ? '' : f.din) + '" placeholder="0"><span>k</span></span></label>' +
+        '<label class="f" for="ff-' + p.id + '">Fichas LIFE<span class="inp"><span>$</span><input id="ff-' + p.id + '" type="number" inputmode="decimal" min="0" step="1" data-campo="fin-fich" data-id="' + p.id + '" value="' + (f.fich == null ? '' : f.fich) + '" placeholder="0"><span>k</span></span></label></div>';
+      if (S.config.objetivos) h += '<label class="toggle"><input type="checkbox" data-campo="fin-obj" data-id="' + p.id + '"' + (f.obj ? ' checked' : '') + '><span><b>Cumpriu o objetivo secreto</b><span>+$100k, com prova</span></span></label>';
+      h += '</div>';
+    });
+    h += '</section><section class="bloco"><header><h2>Placar</h2></header><div id="ranking">' + vRanking() + '</div></section></div>';
+    return h;
+  }
+  function vRanking() {
+    const linhas = S.jogadores.map((p) => {
+      const f = S.final[p.id] || {};
+      const total = num(f.din) * K + num(f.fich) * K + (S.config.objetivos && f.obj ? 100 * K : 0);
+      return { p, total };
+    }).sort((a, b) => b.total - a.total);
+    if (!linhas.some((l) => l.total > 0)) return '<p class="vazio">O placar aparece quando os valores forem digitados.</p>';
+    let h = '<ol class="ranking">';
+    linhas.forEach((l, i) => {
+      const primeiro = i === 0 || l.total === linhas[0].total;
+      h += '<li class="' + (primeiro ? 'primeiro' : '') + '"><span class="pos">' + (i + 1) + 'º</span><span class="nome"><span class="pino" style="--c:' + corHex(l.p.cor) + '"></span><span>' + esc(l.p.nome) + '</span></span><span class="total">' + fmt(l.total) + '</span></li>';
+    });
+    return h + '</ol>';
+  }
+
+  function vRegras() {
+    const ref = (pares) => '<ul class="ref">' + pares.map((x) => '<li><span>' + x[0] + '</span><b>' + x[1] + '</b></li>').join('') + '</ul>';
+    const txt = (itens) => '<ul class="ref texto">' + itens.map((x) => '<li>' + x + '</li>').join('') + '</ul>';
+    let h = '<div class="grade2"><section class="bloco"><header><h2>Regras da casa</h2></header>' + vToggles() + '</section>';
+    h += '<section class="bloco"><header><h2>Aparelho e partida</h2></header>' +
+      '<label class="toggle"><input type="checkbox" data-campo="pref-tela"' + (prefTela() ? ' checked' : '') + '><span><b>Manter a tela ligada</b><span>Evita que o tablet apague durante o jogo.</span></span></label>' +
+      (confirmNova
+        ? '<div class="msg recv">Isso apaga a partida atual. Toque de novo para confirmar.</div><div class="acoes"><button type="button" class="btn recv" data-act="nova-2">Apagar e começar outra</button><button type="button" class="btn" data-act="nova-0">Manter</button></div>'
+        : '<button type="button" class="btn perigo" data-act="nova-1">Nova partida</button>') +
+      '</section>';
+    h += '<section class="bloco"><header><h2>Consulta rápida</h2></header>' +
+      '<details><summary>O banco paga</summary>' + ref([['Salário (parar ou passar)', 'valor da carta'], ['Aumento', '+$10k no salário'], ['Restituição', 'imposto da carta'], ['Empréstimo', '$20k por carta'], ['Faculdade', '$100k (5 cartas)'], ['Investimento', '$5k por acerto'], ['Gire para Vencer', '10× a aposta'], ['Venda de casa', 'preço da carta'], ['Mudar carreira', '2 Aumentos'], ['Aposentadoria', '$10k por filho'], ['Objetivo secreto', '$100k']]) + '</details>' +
+      '<details><summary>O banco recebe</summary>' + ref([['Investimento', '$10k'], ['Volte às aulas', '$50k'], ['Compra de casa', 'preço da carta'], ['Impostos', 'valor da carta'], ['Espaço PAGAR', 'valor do espaço'], ['Aposta (Gire)', 'até $50k'], ['Quitar empréstimo', '$25k por carta'], ['Na aposentadoria (regra da casa)', '$35k por carta']]) + '</details>' +
+      '<details><summary>Entre jogadores</summary>' + ref([['Casamento', '8–10: $10k · 5–7: $5k'], ['Bebê / gêmeos', '$5k de cada'], ['Processo', '$100k de 1 jogador'], ['Carta Receber', 'metade do recebido'], ['Carta Pagar', 'outro paga metade'], ['Tirou 10', '$5k (Patrulha)']]) + '</details>' +
+      '<details><summary>Divisão da Fortuna</summary>' + txt(['<b>Receber:</b> adversário caiu em RECEBER, ele te dá metade.', '<b>Pagar:</b> você caiu em PAGAR, um adversário paga metade ao banco.', '<b>Isenção:</b> anula Receber, Pagar ou Processo. Descarte as duas cartas.', '<b>Gire 2 / 4:</b> cubra 2 ou 4 números com a mesma aposta.', 'Só 1 carta por vez contra o mesmo adversário. Disputa: maior número na roleta.']) + '</details>' +
+      '<details><summary>Espaços laranja</summary>' + txt(['O jogador para, decide e gira de novo.', '<b>Início:</b> Carreira = 1 carta às cegas. Faculdade = $100k de empréstimo, depois 2 Acadêmicas e fica com 1.', '<b>Primeira casa:</b> sem dinheiro, empréstimo obrigatório.', '<b>Família, Risco, Volte às aulas:</b> decide antes de girar.', '<b>Mudar de carreira:</b> 2 Acadêmicas (fica com 1 ou mantém a sua) ou 2 Aumentos.', '<b>Casa melhor:</b> vende a atual e compra outra. Nunca 2 casas.', '<b>Perca o emprego:</b> carta do monte Carreira, nunca Acadêmica; perde os Aumentos.']) + '</details>' +
+      '<details><summary>Dúvidas comuns</summary>' + txt(['<b>Ponteiro entre números?</b> Gira de novo.', '<b>Espaço ocupado?</b> Próximo livre.', '<b>Aumento além do máximo?</b> Fica no máximo.', '<b>Aposentado gira?</b> Sim, na sua vez, pelo Investimento.', '<b>Fichas LIFE acabaram?</b> No espaço LIFE, pega de outro jogador, nunca de quem está na Casa no Campo.', '<b>Quinta:</b> 1º escolhe entre 3 fichas, 2º entre 2, 3º leva a última.']) + '</details>' +
+      '</section></div>';
+    return h;
+  }
+
+  /* ---------- Ações ---------- */
+  function acao(act, d) {
+    const p = d.id ? jog(d.id) : null;
+    switch (act) {
+      case 'tab':
+        tab = d.tab; confirmNova = false; render(); window.scrollTo(0, 0); return;
+      case 'setup-n':
+        S.setup.n = +d.n; salvarSemHistorico(); render(); return;
+      case 'setup-cor':
+        S.setup.jogadores[+d.i].cor = d.cor; salvarSemHistorico(); render(); return;
+      case 'comecar': {
+        const novos = S.setup.jogadores.slice(0, S.setup.n).map((x, i) => ({
+          id: uid(), nome: (x.nome || '').trim() || 'Jogador ' + (i + 1), cor: x.cor,
+          salario: 0, salarioMax: 0, imposto: 0, aumentos: 0, emprestimos: 0, investimento: null, filhos: 0,
+          casaVenda: 0, aposentado: null, aposentando: false, aberto: false
+        }));
+        mudar(() => {
+          S.jogadores = novos; S.fase = 'jogo'; S.vez = 0; S.log = []; S.giro = null; S.final = {};
+          S.gire = { part: {}, resultado: null }; S.calc = novoEstado().calc;
+        }, 'Partida começou. Entregue a cada jogador $10k e 3 cartas Divisão da Fortuna.', 'pay');
+        tab = 'mesa'; render();
+        if (prefTela()) pedirTela();
+        return;
+      }
+      case 'desfazer': {
+        const h = hist.pop();
+        if (!h) return;
+        S = normalizar(JSON.parse(h.s));
+        S.atualizadoEm = Date.now(); salvar(); render();
+        toast('Desfeito: ' + h.rot, 'info');
+        return;
+      }
+      case 'vez': {
+        const prox = (S.vez + 1) % S.jogadores.length;
+        mudar(() => { S.vez = prox; }, null, null, 'troca de vez');
+        toast('Vez de ' + S.jogadores[prox].nome + '.', 'info');
+        return;
+      }
+      case 'giro': {
+        const n = +d.n;
+        const itens = [];
+        S.jogadores.filter((x) => x.investimento === n).forEach((x) => itens.push({ tipo: 'pay', texto: 'Entregue $5k para ' + x.nome + ' (Investimento nº ' + n + ').' }));
+        if (n === 10) {
+          const quem = S.jogadores[S.vez] ? S.jogadores[S.vez].nome : 'quem girou';
+          itens.push({ tipo: 'swap', texto: S.config.patrulhaTodos ? 'Patrulha! Quem gritar primeiro recebe $5k de ' + quem + '.' : 'Se houver Policial e ele perceber, ' + quem + ' paga $5k a ele.' });
+        }
+        const lancar = itens.slice();
+        if (!itens.length) itens.push({ tipo: 'info', texto: 'Saiu ' + n + '. Ninguém tem Investimento nesse número.' });
+        mudar(() => { S.giro = { n, itens }; lancar.forEach((it) => registrar(it.texto, it.tipo)); }, null, null, 'giro ' + n);
+        toast(itens.map((it) => it.texto).join(' '), lancar.length ? lancar[0].tipo : 'info');
+        return;
+      }
+      case 'abrir':
+        if (!p) return; p.aberto = !p.aberto; salvarSemHistorico(); render(); return;
+      case 'salario':
+        if (!p || !p.salario) return;
+        mudar(() => {}, 'Entregue ' + fmt(p.salario) + ' para ' + p.nome + ' (salário).', 'pay'); return;
+      case 'aumento': {
+        if (!p || !p.salario) return;
+        if (p.salarioMax && p.salario >= p.salarioMax) { mudar(() => {}, p.nome + ' já está no salário máximo. Entregue só o salário: ' + fmt(p.salario) + '.', 'pay'); return; }
+        const novo = p.salarioMax ? Math.min(p.salario + 10 * K, p.salarioMax) : p.salario + 10 * K;
+        mudar(() => { p.salario = novo; p.aumentos += 1; }, 'Aumento: entregue ' + fmt(novo) + ' e 1 carta Aumento para ' + p.nome + '.', 'pay');
+        return;
+      }
+      case 'emp-mais':
+        if (!p) return; mudar(() => { p.emprestimos += 1; }, 'Entregue $20k e 1 carta Empréstimo para ' + p.nome + '.', 'pay'); return;
+      case 'emp-quitar':
+        if (!p || !p.emprestimos) return; mudar(() => { p.emprestimos -= 1; }, 'Receba $25k de ' + p.nome + ' e recolha 1 carta Empréstimo.', 'recv'); return;
+      case 'faculdade':
+        if (!p) return; mudar(() => { p.emprestimos += 5; }, 'Faculdade: entregue $100k e 5 cartas Empréstimo para ' + p.nome + '.', 'pay'); return;
+      case 'impostos':
+        if (!p || !p.imposto) return; mudar(() => {}, 'Receba ' + fmt(p.imposto) + ' de ' + p.nome + ' (impostos).', 'recv'); return;
+      case 'restituicao':
+        if (!p || !p.imposto) return; mudar(() => {}, 'Entregue ' + fmt(p.imposto) + ' para ' + p.nome + ' (restituição).', 'pay'); return;
+      case 'perdeu':
+        if (!p) return;
+        mudar(() => { p.salario = 0; p.salarioMax = 0; p.imposto = 0; p.aumentos = 0; p.aberto = true; },
+          p.nome + ' perdeu o emprego: recolha as cartas Aumento. Nova carta do monte Carreira (nunca Acadêmica); preencha os valores.', 'info');
+        return;
+      case 'investir': {
+        if (!p) return;
+        const n = +d.n;
+        if (p.investimento === n) return;
+        if (p.investimento == null) mudar(() => { p.investimento = n; }, 'Receba $10k de ' + p.nome + ': Investimento nº ' + n + '.', 'recv');
+        else mudar(() => { p.investimento = n; }, 'Investimento de ' + p.nome + ' corrigido para nº ' + n + '.', 'info');
+        return;
+      }
+      case 'invest-remover':
+        if (!p) return; mudar(() => { p.investimento = null; }, 'Investimento de ' + p.nome + ' removido.', 'info'); return;
+      case 'filho-mais':
+        if (!p) return; mudar(() => { p.filhos += 1; }, null, null, 'filho de ' + p.nome); return;
+      case 'filho-menos':
+        if (!p || !p.filhos) return; mudar(() => { p.filhos -= 1; }, null, null, 'filho de ' + p.nome); return;
+      case 'aposentar':
+        if (!p) return; p.aposentando = true; p.aberto = false; salvarSemHistorico(); render(); return;
+      case 'apos-cancelar':
+        if (!p) return; p.aposentando = false; salvarSemHistorico(); render(); return;
+      case 'apos-quinta':
+      case 'apos-campo': {
+        if (!p) return;
+        const local = act === 'apos-quinta' ? 'quinta' : 'campo';
+        const c = contaApos(p);
+        const ordem = local === 'quinta' ? S.jogadores.filter((x) => x.aposentado && x.aposentado.local === 'quinta').length + 1 : 0;
+        let ficha;
+        if (local === 'campo') ficha = 'Fichas LIFE protegidas.';
+        else if (ordem === 1) ficha = '1º na Quinta: olha as 3 fichas e fica com 1.';
+        else if (ordem === 2) ficha = '2º na Quinta: escolhe 1 das 2 fichas que sobraram.';
+        else if (ordem === 3) ficha = '3º na Quinta: leva a última ficha.';
+        else ficha = 'A Quinta já não tem fichas.';
+        const partes = [p.nome + ' se aposentou ' + (local === 'quinta' ? 'na Quinta dos Milionários.' : 'na Casa no Campo.')];
+        if (c.emp) partes.push('Receba ' + fmt(c.emp) + ' (empréstimos).');
+        if (c.casa + c.filhos) partes.push('Entregue ' + fmt(c.casa + c.filhos) + ' (casa + filhos).');
+        partes.push(ficha);
+        mudar(() => { p.aposentado = { local, ordem }; p.emprestimos = 0; p.aumentos = 0; p.aposentando = false; }, partes.join(' '), 'info');
+        return;
+      }
+      case 'casal-n':
+        S.calc.casalN = +d.n; salvarSemHistorico(); render(); return;
+      case 'casal-ok': {
+        const q = jog(S.calc.casal); const n = S.calc.casalN;
+        if (!q || !n) return;
+        const v = n >= 8 ? 10 * K : (n >= 5 ? 5 * K : 0);
+        const os = outros(q.id).map((o) => o.nome);
+        const msg = v ? 'Casamento de ' + q.nome + ': ' + listaNomes(os) + ' pagam ' + fmt(v) + ' cada (total ' + fmt(v * os.length) + '). ' + q.nome + ' pega 1 ficha LIFE.'
+          : 'Casamento de ' + q.nome + ': saiu ' + n + ', sem presentes. ' + q.nome + ' pega 1 ficha LIFE.';
+        mudar(() => { S.calc.casalN = null; }, msg, 'swap');
+        return;
+      }
+      case 'bebe': {
+        const q = jog(S.calc.bebe); if (!q) return;
+        const k = +d.k;
+        const os = outros(q.id).map((o) => o.nome);
+        mudar(() => { q.filhos += k; }, (k === 2 ? 'Gêmeos' : 'Bebê') + ' de ' + q.nome + ': ' + listaNomes(os) + ' pagam $5k cada (total ' + fmt(5 * K * os.length) + '). ' + q.nome + ' pega 1 ficha LIFE e ' + k + (k === 2 ? ' pinos.' : ' pino.'), 'swap');
+        return;
+      }
+      case 'gire-num': {
+        const pt = S.gire.part[d.id] || (S.gire.part[d.id] = { on: true, aposta: 10, nums: [] });
+        const n = +d.n; const i = pt.nums.indexOf(n);
+        if (i >= 0) pt.nums.splice(i, 1);
+        else if (pt.nums.length >= 4) { toast('No máximo 4 números (carta Gire para Vencer 4).', 'info'); return; }
+        else pt.nums.push(n);
+        S.gire.resultado = null; salvarSemHistorico(); render(); return;
+      }
+      case 'gire-res': {
+        const n = +d.n;
+        const apostas = []; const ganhos = [];
+        S.jogadores.forEach((x) => {
+          const pt = S.gire.part[x.id];
+          if (!pt || !pt.on || !(pt.aposta > 0)) return;
+          apostas.push(x.nome + ' ' + fmt(pt.aposta * K));
+          if (pt.nums.indexOf(n) >= 0) ganhos.push('Entregue ' + fmt(pt.aposta * K * 10) + ' para ' + x.nome + ' (10 × ' + fmt(pt.aposta * K) + ')');
+        });
+        if (!apostas.length) return;
+        const texto = 'Gire para Vencer, saiu ' + n + '. ' + (ganhos.length ? ganhos.join('; ') + '.' : 'Ninguém acertou: o banco fica com as apostas.');
+        mudar(() => { S.gire.resultado = { n, texto, tipo: ganhos.length ? 'pay' : 'info' }; }, 'Apostas recebidas: ' + apostas.join(' · ') + '. ' + texto, ganhos.length ? 'pay' : 'recv');
+        return;
+      }
+      case 'gire-novo':
+        S.gire = { part: {}, resultado: null }; salvarSemHistorico(); render(); return;
+      case 'nova-1':
+        confirmNova = true; render(); return;
+      case 'nova-0':
+        confirmNova = false; render(); return;
+      case 'nova-2': {
+        const velho = S;
+        S = novoEstado();
+        S.config = velho.config;
+        if (velho.jogadores.length) {
+          S.setup.n = velho.jogadores.length;
+          velho.jogadores.forEach((x, i) => { if (S.setup.jogadores[i]) S.setup.jogadores[i] = { nome: x.nome, cor: x.cor }; });
+        } else S.setup = velho.setup;
+        hist = []; confirmNova = false; tab = 'mesa';
+        salvarSemHistorico(); render(); window.scrollTo(0, 0);
+        return;
+      }
+    }
+  }
+
+  function campo(el, ev) {
+    const c = el.dataset.campo;
+    const p = el.dataset.id ? jog(el.dataset.id) : null;
+    const noInput = { 'setup-nome': 1, 'p-casa': 1, 'metade': 1, 'fin-din': 1, 'fin-fich': 1 };
+    if (noInput[c] ? ev !== 'input' : ev !== 'change') return;
+    switch (c) {
+      case 'setup-nome':
+        S.setup.jogadores[+el.dataset.i].nome = el.value; salvarSemHistorico(); return;
+      case 'cfg':
+        S.config[el.dataset.k] = el.checked; salvarSemHistorico(); render(); return;
+      case 'pref-tela':
+        setPrefTela(el.checked); if (el.checked) pedirTela(); else soltarTela(); return;
+      case 'p-nome': {
+        if (!p) return; const v = el.value.trim(); if (!v || v === p.nome) return;
+        mudar(() => { p.nome = v; }, null, null, 'nome de ' + p.nome); return;
+      }
+      case 'p-salario':
+      case 'p-max':
+      case 'p-imposto': {
+        if (!p) return;
+        const chave = c === 'p-salario' ? 'salario' : (c === 'p-max' ? 'salarioMax' : 'imposto');
+        const v = Math.max(0, Math.round(num(el.value) * K));
+        if (v === p[chave]) return;
+        mudar(() => { p[chave] = v; }, null, null, 'carreira de ' + p.nome); return;
+      }
+      case 'p-casa': {
+        if (!p) return; p.casaVenda = Math.max(0, num(el.value)); salvarSemHistorico();
+        const ul = document.getElementById('conta-' + p.id); if (ul) ul.innerHTML = vConta(p);
+        return;
+      }
+      case 'casal':
+        S.calc.casal = el.value; salvarSemHistorico(); render(); return;
+      case 'bebe':
+        S.calc.bebe = el.value; salvarSemHistorico(); render(); return;
+      case 'gire-on': {
+        const pt = S.gire.part[el.dataset.id] || (S.gire.part[el.dataset.id] = { on: false, aposta: 10, nums: [] });
+        pt.on = el.checked; S.gire.resultado = null; salvarSemHistorico(); render(); return;
+      }
+      case 'gire-aposta': {
+        const pt = S.gire.part[el.dataset.id]; if (!pt) return;
+        pt.aposta = Math.min(50, Math.max(0, num(el.value)));
+        if (pt.aposta !== num(el.value)) toast('A aposta vai de $1k a $50k.', 'info');
+        S.gire.resultado = null; salvarSemHistorico(); render(); return;
+      }
+      case 'metade': {
+        S.calc.metade = el.value; salvarSemHistorico();
+        const r = document.getElementById('metade-res'); if (r) r.textContent = 'Metade: ' + fmt(num(el.value) * K / 2);
+        return;
+      }
+      case 'fin-din':
+      case 'fin-fich':
+      case 'fin-obj': {
+        const id = el.dataset.id;
+        const f = S.final[id] || (S.final[id] = {});
+        if (c === 'fin-obj') f.obj = el.checked;
+        else f[c === 'fin-din' ? 'din' : 'fich'] = el.value === '' ? null : num(el.value);
+        salvarSemHistorico();
+        const r = document.getElementById('ranking'); if (r) r.innerHTML = vRanking();
+        return;
+      }
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    acao(b.dataset.act, b.dataset);
+  });
+  document.addEventListener('input', (e) => { const el = e.target; if (el && el.dataset && el.dataset.campo) campo(el, 'input'); });
+  document.addEventListener('change', (e) => { const el = e.target; if (el && el.dataset && el.dataset.campo) campo(el, 'change'); });
+
+  /* ---------- Início ---------- */
+  function start(data) {
+    const vindo = data && data.S ? data.S : lerLocal();
+    S = normalizar(vindo);
+    if (data && data.tab) tab = data.tab;
+    render();
+    setStatus(lsOk ? 'salvo neste aparelho' : 'conectando…');
+    conectar(0);
+    try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({ S: S, tab: tab })); } catch (e) {}
+  }
+  const hot = window.claude && window.claude.hot;
+  if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
+})();
+</script>
+
+</body>
+</html>
