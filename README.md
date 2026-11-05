@@ -14,6 +14,3 @@ Assistente para quem faz o papel de banqueiro no Jogo da Vida. O dinheiro de pap
 
 ## Como usar no celular ou tablet
 Abra o link e use "Adicionar à tela de início". A partida fica salva no navegador do aparelho.
-
----
-Projeto de fã, sem vínculo com a Hasbro. "Jogo da Vida" é marca registrada da Hasbro.
